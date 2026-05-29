@@ -1,0 +1,142 @@
+#title {
+    font-size: 48px;
+}
+
+div#settings>input {
+    display: inline-block;
+    width: 100px;
+    text-align: center;
+}
+
+#config>div {
+    display: inline-block;
+    margin: 2px 10px;
+}
+
+div#config>div>input#winning-pt,#max-of-questions {
+    width: 55px;
+    font-size: 16px;
+    text-align: right;
+}
+
+div#common {
+    font-size: 24px;
+}
+
+div#common>div#secret-counter {
+    display: none;
+}
+
+div#common>div#number-of-done    {
+    display: inline-block;
+    width: 50px;
+    text-align: right;
+}
+
+div#common>input {
+    display: inline-block;
+    width: 100px;
+    text-align: center;
+}
+
+div.team {
+    display: inline-block;
+    margin: 10px 0px;
+    width: 616px;
+}
+
+div.team table {
+    margin: 0px
+}
+
+/* div.team div.team-score {
+    overflow-y: scroll;
+} */
+
+.team table tr>th,td {
+    border: solid 1px;
+    text-align: center;
+}
+
+.team table tr.result-display>th {
+    border: none;
+    height: 50px;
+    font-size: 32px;
+}
+
+.team table tr.team-name>th {
+    height: 50px;
+}    
+
+.team table tr.team-name>th>input {
+    border: none;
+    background: none;
+    text-align: center;
+    width: 400px;
+    font-size: 32px;
+}    
+
+.team table tr.team-pt>td {
+    height: 70px;
+    font-size: 48px;
+}
+
+.team table tr.player-name>th {
+    height: 40px;
+}    
+
+.team table tr.player-name>th>input {
+    border: none;
+    background: none;
+    text-align: center;
+    width: 100px;
+    font-size: 24px;
+}    
+
+.team table tr.player-pt>td {
+    height: 75px;
+    font-size: 48px;
+}
+
+.team table tr.incorrect>td {
+    height: 75px;
+    font-size: 48px;
+}
+
+.team table tr.status-input>td {
+    width: 50px;
+    border: none;
+}
+
+.team table tr.status-input>td>input {
+    width: 45px;
+    height: 45px;
+}
+
+.team table .row-header {
+    border: none;
+    width: 20px;
+}
+
+.history-data-row {
+    height: 28px;
+}
+
+/* .team tr.history-data-row td.row-header {
+    border: solid 1px;
+} */
+
+div.team div.history-header {
+    margin: 40px 0px 0px 0px;
+}
+
+.team div.history-data {
+    border: 1px;
+    height: 250px;
+    overflow-y: scroll;
+}
+
+.team table .dummy-row>td {
+    width: 50px;
+    border: none;
+}

@@ -1,0 +1,565 @@
+window.addEventListener('DOMContentLoaded', function() {
+
+    // 全角数字を半角数字に変換する
+    function ConvertNumberDoubleToSingleByte(str) {
+        ret = str.replace(/[０-９]/g, function (s) {
+            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+        })
+        return ret;
+    }
+
+    // 数値入力の正規化(半角の自然数にする)
+    function NormalizeAndValidateNumberString(str) {
+        ret = ConvertNumberDoubleToSingleByte(str);
+        return ret.trim();
+    }
+
+    // チーム得点計算
+    function CalcTeamPt(arr_pt) {
+        let ret = 1;
+        for(let i = 0; i < arr_pt.length; i++) {
+            ret *= arr_pt[i].innerText;
+        }
+        return ret;
+    }
+
+    // リーチ判定(個人)
+    function JudgeReach_personal(team_pt, player_pt) {
+        if ((parseInt(team_pt) / parseInt(player_pt)) * (parseInt(player_pt) + 1) >= parseInt(document.getElementById("winning-pt").value)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    // リーチ判定(チーム)
+    function JudgeReach_Team(team) {
+        let team_pt = document.getElementById("team-" + team + "-pt").innerText;
+        for (let i = 1; i <= 5; i ++) {
+            let obj_pt = document.getElementById(team + i + "-pt");
+            if (JudgeReach_personal(team_pt, obj_pt.innerText)) {
+                obj_pt.style.backgroundColor = 'orange';
+            } else {
+                obj_pt.style.backgroundColor = 'transparent';
+            }
+        }
+    }
+
+    // 封鎖判定(個人)
+    function JudgeBlockade_Personal(incorrect_pt) {
+        if (incorrect_pt == '✕✕') {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    // 封鎖判定(チーム)
+    function JudgeBlockade_Team(team) {
+        for (let i = 1; i <= 5; i ++) {
+            let player_name = document.getElementById("name-" + team + i)
+            let obj_pt = document.getElementById(team + i + "-pt");
+            let incorrect_pt = document.getElementById(team + i + "-incorrect");
+            if (JudgeBlockade_Personal(incorrect_pt.innerText)) {
+                player_name.style.backgroundColor = 'red';
+                incorrect_pt.style.backgroundColor = 'red';
+                obj_pt.style.backgroundColor = 'red';
+            } else {
+                player_name.style.backgroundColor = 'transparent';
+                if (obj_pt.style.backgroundColor !== 'orange') {
+                    obj_pt.style.backgroundColor = 'transparent';
+                }
+                incorrect_pt.style.backgroundColor = 'transparent';
+            }
+        }
+    }
+
+    // 勝敗結果表示
+    function DisplayMathcResult(result) {
+        let obj_team_a_pt = document.getElementById("team-a-pt");
+        let obj_team_b_pt = document.getElementById("team-b-pt");
+        let a_result_display = document.getElementById("a-result-display");
+        let b_result_display = document.getElementById("b-result-display");
+        let winning_pt = parseInt(document.getElementById("winning-pt").value);
+        obj_team_a_pt.style.backgroundColor = 'transparent';
+        obj_team_b_pt.style.backgroundColor = 'transparent';
+        switch (result[0]) {
+            case 'awin':
+                obj_team_a_pt.style.backgroundColor = 'orange';
+                a_result_display.innerText = 'WIN';
+                b_result_display.innerText = 'LOSE';
+                if (result[1] == true) {obj_team_a_pt.innerText = winning_pt;}
+                break;
+            case 'bwin':
+                obj_team_b_pt.style.backgroundColor = 'orange';
+                a_result_display.innerText = 'LOSE';
+                b_result_display.innerText = 'WIN';
+                if (result[1] == true) {obj_team_b_pt.innerText = winning_pt;}
+                break;
+            case 'draw':
+                a_result_display.innerText = 'DRAW';
+                b_result_display.innerText = 'DRAW';
+                break;
+            default:
+                a_result_display.innerText = '';
+                b_result_display.innerText = '';
+        }
+    }
+
+    // 勝利判定(戻り値: array 第0要素 {TeamA勝利: 'awin', TeamB勝利: 'bwin', 引分け: 'draw', 継続中:'ongoing'},
+    //                       第1要素 {勝利ポイント以上での勝利か？ yes: true, no: false})
+    function JudgeMatch() {
+        let winning_pt = parseInt(document.getElementById("winning-pt").value);
+        let obj_team_a_pt = document.getElementById("team-a-pt");
+        let obj_team_b_pt = document.getElementById("team-b-pt");
+        let a_pt = parseInt(obj_team_a_pt.innerText);
+        let b_pt = parseInt(obj_team_b_pt.innerText);
+        // 勝利ポイントを超えたチームは勝ちとする
+        if (parseInt(a_pt) >= winning_pt) {
+            return ['awin', true];
+        }
+        else if (parseInt(b_pt) >= winning_pt) {
+            return ['bwin', true];
+        }
+        // 一方のチーム全員が２✕になったら相手チームを勝ちとする
+        let teams = ['a', 'b'];
+        let loseteam = 'ongoing'
+        for (let i = 0; i < teams.length; i++) {
+            let team = teams[i];
+            loseteam = team;
+            let player_incorrects = document.getElementsByClassName("team-" + team + "-player-incorrect");
+            for (let j = 0; j < player_incorrects.length; j++) {
+                let player_incorrect = player_incorrects[j];
+                if (player_incorrect.innerText != '✕✕') {
+                    loseteam = 'ongoing';
+                    break;
+                }
+            }
+            if (loseteam != 'ongoing') {
+                break;
+            }
+        }
+        switch (loseteam) {
+            case 'a' :
+                return ['bwin', false];
+            case 'b' :
+                return ['awin', false];
+            default :
+        }
+        // 問題数上限が無ければ試合継続中として関数を抜ける
+        if (document.getElementById("infinity").checked) {
+            return 'ongoing';
+        }
+        // 規定問題数終了していなければ試合継続中として関数を抜ける？
+        let max_of_questions = parseInt(document.getElementById("max-of-questions").value);
+        let done = parseInt(document.getElementById("secret-counter").innerText);
+        if (max_of_questions >= done) {
+            return 'ongoing';
+        }
+        // 規定問題集終了したので勝利判定する
+        if (a_pt > b_pt) {
+            return ['awin', false];
+        }
+        else if (b_pt > a_pt) {
+            return ['bwin', false];
+        }
+        else {
+            return ['draw', false];
+        }
+    }
+
+    // 全体を再計算
+    function CalcAll() {
+        var arr_a_pt = document.getElementsByClassName("team-a-player-pt");
+        var arr_b_pt = document.getElementsByClassName("team-b-player-pt");
+        var a_pt = CalcTeamPt(arr_a_pt);
+        var b_pt = CalcTeamPt(arr_b_pt);
+        document.getElementById("team-a-pt").innerText=a_pt;
+        document.getElementById("team-b-pt").innerText=b_pt;
+        JudgeReach_Team('a');
+        JudgeReach_Team('b');
+        JudgeBlockade_Team('a');
+        JudgeBlockade_Team('b');
+        let result = JudgeMatch();
+        DisplayMathcResult(result);
+    }
+
+    // 問題数表示を更新する
+    function RefreshNumberOfDone() {
+        let blnshow = (document.getElementById("show-hide-counter").value == "Show Count");
+        let counter = document.getElementById("number-of-done");
+        if (blnshow) {
+            counter.innerText = '?';
+            HideHistoryNumber(true);
+        }
+        else
+        {
+            let count = parseInt(document.getElementById("secret-counter").innerText);
+            let max_of_questions = parseInt(document.getElementById("max-of-questions").value);
+            let infinity = document.getElementById("infinity");
+            if (infinity.checked||count <= max_of_questions) {
+                counter.innerText = document.getElementById("secret-counter").innerText;
+            }
+            else{
+                counter.innerText ="END";
+            }
+            HideHistoryNumber(false);
+        }
+    }
+
+    // 問題数を+1する
+    function SecretCounterUp() {
+        let done = parseInt(document.getElementById("secret-counter").innerText);
+        document.getElementById("secret-counter").innerText = done + 1;
+        RefreshNumberOfDone();
+    }
+
+    // 終了状態の判断
+    function isEnd() {
+        if (document.getElementById("a-result-display").innerText != '') {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    // historyの全員の正誤成績を集計して表示する
+    function SumAllPlayersResult() {
+        let teams = ['a', 'b'];
+        for (let i = 0; i < teams.length; i++) {
+            let team = teams[i];
+            for (let j = 1; j <= 5; j++) {
+                let player = team + j;
+                SumOneOlayerResult(player)
+            }
+        }
+    }
+
+    // historyの個人の正誤成績を集計して表示する
+    function SumOneOlayerResult(player) {
+        let cells = document.getElementsByClassName(player + "-history");
+        let result_cell = document.getElementById(player + "-player-sum");
+        let cnt_correct = 0;
+        let cnt_incorrect = 0;
+        for (let i = 0; i < cells.length; i ++) {
+            let txt = cells[i].innerText;
+            if (txt == '〇') {
+                cnt_correct++;
+            }
+            else if (txt == '✕'){
+                cnt_incorrect++;
+            }
+        }
+        result_cell.innerText = `〇:${cnt_correct} ✕:${cnt_incorrect}`;
+    }
+
+    // historyテーブルを一番下までスクロールする
+    function ScrollToBottomHistoryTable() {
+        let table = document.getElementsByClassName("history-data");
+        for (let i = 0; i < table.length; i ++) {
+            table[i].scrollTop = table[i].scrollHeight;
+        }
+    }
+
+    // historyテーブルに列を追加する
+    function AddARowToHistoryTable(team, player, ox) {
+        let table = document.getElementsByClassName("history-table");
+        for (let i = 0; i < table.length; i ++) {
+            let table_i = table[i];
+            let id = table_i.id;
+            let num_row = table_i.rows.length;
+            let row = table_i.insertRow(num_row - 1);
+            row.classList.add('history-data-row');
+            let cell1 = row.insertCell(-1);
+            cell1.classList.add('row-header');
+            RefreshNumberOfDone();
+            cell1.innerText = num_row;
+            //
+            let is_acted_table = (id == 'history-team-' + team);
+            for (let j = 1; j <= 5; j ++) {
+                let cell_player_number = j;
+                if (i ==0) {
+                    cell_player_number = 6 - cell_player_number;
+                }
+                let cell = row.insertCell(-1);
+                cell.id = team + cell_player_number + '-history-' + num_row;
+                cell.classList = team + cell_player_number + '-history';
+                cell.setAttribute('colspan', '2');
+                if (is_acted_table && player == cell_player_number) {
+                    if (ox == 'o') {            // 半角文字
+                        cell.innerText = '〇';  // 全角文字
+                    }
+                    else if (ox == 'x') {       // 半角文字
+                        cell.innerText = '✕';  // 全角文字
+                    }
+                }
+                if (team == undefined) {
+                    cell.style.backgroundColor = '#CCCCCC';
+                }
+            }
+        }
+        SumAllPlayersResult();
+        ScrollToBottomHistoryTable();
+    }
+
+    // historyテーブルの履歴行を全て削除する
+    function DeleteAllHistoryRows() {
+        let table = document.getElementsByClassName("history-table");
+        for (let i = 0; i < table.length; i ++) {
+            let table_i = table[i];
+            for (let j = table_i.rows.length - 2; j >= 0 ; j --) {
+                table_i.deleteRow(j);
+            }
+        }
+    }
+
+    // historyテーブルを初期化する
+    function ResetHistoryTable() {
+        // 履歴行を全て削除する
+        DeleteAllHistoryRows();
+        // 個人成績を初期化する
+        SumAllPlayersResult();
+    }
+
+    // historyテーブルの問題番号列の表示／非表示を切り替える
+    function HideHistoryNumber(bHide) {
+        let hideshow = 'visible';
+        if (bHide) {
+            hideshow = 'hidden';
+        }
+        let table = document.getElementsByClassName("history-table");
+        for (let i = 0; i < table.length; i ++) {
+            let table_i = table[i];
+            for (let j = table_i.rows.length - 2; j >= 0 ; j --) {
+                table_i.rows[j].cells[0].style.visibility = hideshow;
+            }
+        }
+    }
+
+    // infinityチェックボックス押下イベントを設定
+    function SetInfinity() {
+        let infinity = document.getElementById("infinity");
+        let max_of_questions = document.getElementById("max-of-questions");
+        infinity.addEventListener('change', function() {
+            if (infinity.checked) {
+                max_of_questions.setAttribute("escape-value", max_of_questions.value);
+                max_of_questions.disabled = true;
+                max_of_questions.value = "no limit";
+            }
+            else {
+                max_of_questions.disabled = false;
+                max_of_questions.value = max_of_questions.getAttribute("escape-value");
+            }
+        }, false);
+    }
+
+    // 正解ボタン押下イベントを設定
+    function SetCorrectButton(team) {
+        for (let i = 1; i <= 5; i ++) {
+            let p = team + i;
+            document.getElementById(p + "-btn-correct").addEventListener('click', function() {
+                if (isEnd()) {return;};
+                if (document.getElementById(p + '-incorrect').innerText == '✕✕') {return;}
+                let pt = parseInt(document.getElementById(p + "-pt").innerText);
+                document.getElementById(p + "-pt").innerText = pt + 1;
+                SecretCounterUp();
+                AddARowToHistoryTable(team, i, 'o');
+                CalcAll();
+            }, false);
+        }
+    }
+
+    // 誤答ボタン押下イベントを設定
+    function SetIncorrectButton(my_team,enemy_team) {
+        for (let i = 1; i <= 5; i++) {
+            let p = my_team + i;
+
+            document.getElementById(p + "-btn-incorrect").addEventListener('click', function() {
+                if (isEnd()) {return;};
+                let obj_x = document.getElementById(p + '-incorrect');
+                if (obj_x.innerText == '') {
+                    obj_x.innerText = '✕'
+                }
+                else if (obj_x.innerText == '✕') {
+                    obj_x.innerText = '✕✕';
+                }
+                else{
+                    return;
+                }
+                // 相手の解答権が無い人を復活させる
+                for (let j = 1; j <=  5; j++) {
+                    let e = enemy_team + j;
+                    let obj_e_x = document.getElementById(e + '-incorrect');
+                    if (obj_e_x.innerText == '✕✕') {
+                        obj_e_x.innerText = '✕';
+                    }
+                }
+                document.getElementById(p + "-pt").innerText = 1;
+                SecretCounterUp();
+                AddARowToHistoryTable(my_team, i, 'x');
+                CalcAll();
+            }, false);
+        }
+    }
+
+    // データの個別修正処理を設定
+    function SetDataChangeEvent(team) {
+        for (let i = 1; i <= 5; i ++) {
+            let p = team + i;
+            // 個人点数の修正処理
+            let pt_cell = document.getElementById(p + "-pt");
+            pt_cell.addEventListener('dblclick', function() {
+                let val = window.prompt("変更する値を入力してください", pt_cell.innerText);
+                val = NormalizeAndValidateNumberString(val);
+                val = parseInt(val);
+                if ((Number.isInteger(val)) && (val > 0)) {
+                    pt_cell.innerText = val;
+                    CalcAll();
+                }
+                else {
+                    alert("正の整数ではありません")
+                }
+            }, false);
+
+            // 個人不正解数の修正処理
+            let incorrect_cell = document.getElementById(p + "-incorrect");
+            incorrect_cell.addEventListener('dblclick', function() {
+                let val = window.prompt("変更する値を入力してください", incorrect_cell.innerText);
+                if (val == null) {
+                    return;
+                }
+                else if (val == ''||val == '✕'||val == '✕✕') {
+                    incorrect_cell.innerText = val;
+                    CalcAll();
+                }
+                else {
+                    alert("入力が正しくありません")
+                }
+            }, false);
+        }
+    }
+
+    // チームの初期化
+    function ResetPlayerPt(team) {
+        // ポイントの初期化
+        for (let i = 1; i<=5; i ++) {
+            let p = team + i;
+            document.getElementById(p + "-pt").innerText = '1';
+            document.getElementById(p + "-incorrect").innerText = '';
+            CalcAll();
+        }
+    }
+
+    // テキスト出力用の文字列を生成する
+    function CreateResultString() {
+        let outtxt = '';
+    }
+
+    // "reset"ボタン押下時の処理
+    document.getElementById("btn-reset").addEventListener('click', function() {
+        if (!confirm('全てリセットしてよろしいですか？')) {
+            return;
+        }
+        ResetPlayerPt('a');
+        ResetPlayerPt('b');
+        document.getElementById("secret-counter").innerText = "1";
+        RefreshNumberOfDone();
+        ResetHistoryTable();
+        document.getElementById("a-result-display").innerText = '';
+        document.getElementById("b-result-display").innerText = '';
+    }, false);
+
+    // "refresh"ボタン押下時の処理
+    this.document.getElementById("btn-refresh").addEventListener('click', function(){
+        CalcAll();
+    }, false);
+
+    // "winning points"の入力時のバリデーションと再計算
+    document.getElementById("winning-pt").addEventListener('blur', function(){
+        const winPt = document.getElementById("winning-pt");
+        var newValue = NormalizeAndValidateNumberString(winPt.value);
+        newValue = parseInt(newValue);
+        if ((Number.isInteger(newValue)) && (newValue > 0)) {
+            winPt.value = newValue;
+            winPt.setAttribute("value", newValue);
+            winPt.setAttribute("escape-value", newValue);
+            CalcAll();
+        }
+        else {
+            const escValue = winPt.getAttribute("escape-value");
+            winPt.value = escValue;
+        }
+    }), false;
+
+    // "max of questions"の入力時のバリデーションと再計算
+    document.getElementById("max-of-questions").addEventListener('blur', function(){
+        const maxQuestions = document.getElementById("max-of-questions");
+        var newValue = NormalizeAndValidateNumberString(maxQuestions.value);
+        newValue = parseInt(newValue);
+        if ((Number.isInteger(newValue)) && (newValue > 0)) {
+            maxQuestions.value = newValue;
+            maxQuestions.setAttribute("value", newValue);
+            maxQuestions.setAttribute("escape-value", newValue);
+            CalcAll();
+        }
+        else {
+            const escValue = maxQuestions.getAttribute("escape-value");
+            maxQuestions.value = escValue;
+        }
+    }), false;
+
+    // "Throwgh"ボタン押下時の処理
+    document.getElementById("through").addEventListener('click', function() {
+        if (isEnd()) {return;};
+        SecretCounterUp();
+        AddARowToHistoryTable();
+    }, false);
+
+　  // "Show Count/Hide Count"ボタン押下時の処理
+    document.getElementById("show-hide-counter").addEventListener('click', function() {
+        let showhide_count_btn = document.getElementById("show-hide-counter");
+        if (showhide_count_btn.value == 'Show Count') {
+            showhide_count_btn.value = 'Hide Count';
+        }
+        else {
+            showhide_count_btn.value = 'Show Count';
+        }
+        RefreshNumberOfDone();
+    },false);
+
+    // "Show History/Hide History"ボタン押下時の処理
+    document.getElementById("history-show-hide").addEventListener('click', function() {
+        let showhide_history_btn = document.getElementById("history-show-hide");
+        let bshow = showhide_history_btn.value == 'Show History';
+        if (bshow) {
+            showhide_history_btn.value = 'Hide History';
+        }
+        else {
+            showhide_history_btn.value = 'Show History';
+        }
+        let history_data_row = document.getElementsByClassName("history");
+        for (let i = 0; i < history_data_row.length; i++) {
+            if (bshow) {
+                history_data_row[i].style.display = "block";
+            }
+            else {
+                history_data_row[i].style.display = "none";
+            }
+        }
+    }, false);
+
+     // イベント設定
+    SetInfinity();
+    SetCorrectButton('a');
+    SetCorrectButton('b');
+    SetIncorrectButton('a','b');
+    SetIncorrectButton('b','a');
+    SetDataChangeEvent('a');
+    SetDataChangeEvent('b');
+
+    // 画面ロード時の初期処理
+    CalcAll();
+
+});
