@@ -3,6 +3,7 @@ window.addEventListener('DOMContentLoaded', function() {
     let historyRecords = [];
     let undoStack = [];
     let redoStack = [];
+    const autoSaveStorageKey = 'aql-score-board-auto-save';
 
     // 全角数字を半角数字に変換する
     function ConvertNumberDoubleToSingleByte(str) {
@@ -426,6 +427,7 @@ window.addEventListener('DOMContentLoaded', function() {
                 max_of_questions.disabled = false;
                 max_of_questions.value = max_of_questions.getAttribute("escape-value");
             }
+            SaveAutoState();
         }, false);
     }
 
@@ -450,6 +452,7 @@ window.addEventListener('DOMContentLoaded', function() {
         SecretCounterUp();
         AddARowToHistoryTable(team, playerNumber, 'o', memberNumber);
         CalcAll();
+        SaveAutoState();
     }
 
     // 誤答ボタン押下イベントを設定
@@ -490,6 +493,7 @@ window.addEventListener('DOMContentLoaded', function() {
         SecretCounterUp();
         AddARowToHistoryTable(my_team, playerNumber, 'x', memberNumber);
         CalcAll();
+        SaveAutoState();
     }
 
     // 個人用の正解・誤答ボタン押下イベントを設定
@@ -520,6 +524,7 @@ window.addEventListener('DOMContentLoaded', function() {
                     SaveUndoState();
                     pt_cell.innerText = val;
                     CalcAll();
+                    SaveAutoState();
                 }
                 else {
                     alert("正の整数ではありません")
@@ -537,6 +542,7 @@ window.addEventListener('DOMContentLoaded', function() {
                     SaveUndoState();
                     incorrect_cell.innerText = val;
                     CalcAll();
+                    SaveAutoState();
                 }
                 else {
                     alert("入力が正しくありません")
@@ -573,6 +579,18 @@ window.addEventListener('DOMContentLoaded', function() {
         const inputs = document.querySelectorAll('.member-name input');
         for (let i = 0; i < inputs.length; i++) {
             FitMemberNameInput(inputs[i]);
+        }
+    }
+
+    function SetTextInputAutoSaveEvent() {
+        const inputs = document.querySelectorAll('tr.team-name input, tr.player-name input, tr.member-name input');
+        for (let i = 0; i < inputs.length; i++) {
+            inputs[i].addEventListener('input', function() {
+                if (inputs[i].closest('tr').classList.contains('member-name')) {
+                    FitMemberNameInput(inputs[i]);
+                }
+                SaveAutoState();
+            }, false);
         }
     }
 
@@ -657,6 +675,18 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById("btn-redo").disabled = redoStack.length == 0;
     }
 
+    function SaveAutoState() {
+        localStorage.setItem(autoSaveStorageKey, JSON.stringify({
+            state: CreateHistoryExportData(),
+            undoStack: undoStack,
+            redoStack: redoStack
+        }));
+    }
+
+    function ClearAutoState() {
+        localStorage.removeItem(autoSaveStorageKey);
+    }
+
     function PushUndoSnapshot(snapshot) {
         undoStack.push(CloneExportData(snapshot));
         redoStack = [];
@@ -677,6 +707,7 @@ window.addEventListener('DOMContentLoaded', function() {
         }
         redoStack.push(CaptureStateSnapshot());
         RestoreStateSnapshot(undoStack.pop());
+        SaveAutoState();
         UpdateUndoRedoButtons();
     }
 
@@ -686,6 +717,7 @@ window.addEventListener('DOMContentLoaded', function() {
         }
         undoStack.push(CaptureStateSnapshot());
         RestoreStateSnapshot(redoStack.pop());
+        SaveAutoState();
         UpdateUndoRedoButtons();
     }
 
@@ -918,6 +950,7 @@ window.addEventListener('DOMContentLoaded', function() {
         RefreshNumberOfDone();
         ApplyShowHistoryState(data.showHistory !== false);
         FitAllMemberNameInputs();
+        SaveAutoState();
     }
 
     function ImportHistoryJsonFile(file) {
@@ -938,6 +971,28 @@ window.addEventListener('DOMContentLoaded', function() {
         reader.readAsText(file);
     }
 
+    function RestoreAutoSavedState() {
+        let savedText = localStorage.getItem(autoSaveStorageKey);
+        if (!savedText) {
+            return false;
+        }
+        try {
+            let savedData = JSON.parse(savedText);
+            let data = savedData.state || savedData;
+            if (confirm('前回の状態を復元しますか？')) {
+                ImportHistoryData(data, false);
+                undoStack = Array.isArray(savedData.undoStack) ? savedData.undoStack : [];
+                redoStack = Array.isArray(savedData.redoStack) ? savedData.redoStack : [];
+                UpdateUndoRedoButtons();
+                return true;
+            }
+        }
+        catch (e) {
+            ClearAutoState();
+        }
+        return false;
+    }
+
     // "reset"ボタン押下時の処理
     document.getElementById("btn-reset").addEventListener('click', function() {
         if (!confirm('全てリセットしてよろしいですか？')) {
@@ -951,6 +1006,7 @@ window.addEventListener('DOMContentLoaded', function() {
         document.getElementById("a-result-display").innerText = '';
         document.getElementById("b-result-display").innerText = '';
         ResetUndoRedoHistory();
+        ClearAutoState();
     }, false);
 
     // "refresh"ボタン押下時の処理
@@ -1001,6 +1057,7 @@ window.addEventListener('DOMContentLoaded', function() {
             winPt.setAttribute("value", newValue);
             winPt.setAttribute("escape-value", newValue);
             CalcAll();
+            SaveAutoState();
         }
         else {
             const escValue = winPt.getAttribute("escape-value");
@@ -1026,6 +1083,7 @@ window.addEventListener('DOMContentLoaded', function() {
             maxQuestions.setAttribute("value", newValue);
             maxQuestions.setAttribute("escape-value", newValue);
             CalcAll();
+            SaveAutoState();
         }
         else {
             const escValue = maxQuestions.getAttribute("escape-value");
@@ -1040,6 +1098,7 @@ window.addEventListener('DOMContentLoaded', function() {
         SaveUndoState();
         SecretCounterUp();
         AddARowToHistoryTable();
+        SaveAutoState();
     }, false);
 
 　  // "Show Count/Hide Count"ボタン押下時の処理
@@ -1053,6 +1112,7 @@ window.addEventListener('DOMContentLoaded', function() {
             showhide_count_btn.value = 'Show Count';
         }
         RefreshNumberOfDone();
+        SaveAutoState();
     },false);
 
     // "Show History/Hide History"ボタン押下時の処理
@@ -1075,6 +1135,7 @@ window.addEventListener('DOMContentLoaded', function() {
                 history_data_row[i].style.display = "none";
             }
         }
+        SaveAutoState();
     }, false);
 
      // イベント設定
@@ -1088,8 +1149,10 @@ window.addEventListener('DOMContentLoaded', function() {
     SetDataChangeEvent('a');
     SetDataChangeEvent('b');
     SetMemberNameFitEvent();
+    SetTextInputAutoSaveEvent();
 
     // 画面ロード時の初期処理
     CalcAll();
+    RestoreAutoSavedState();
 
 });
