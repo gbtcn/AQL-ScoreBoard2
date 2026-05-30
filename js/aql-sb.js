@@ -826,6 +826,14 @@ window.addEventListener('DOMContentLoaded', function() {
             + pad2(date.getSeconds());
     }
 
+    function SanitizeFileNamePart(value, fallback) {
+        let fileNamePart = value.trim().replace(/[\\/:*?"<>|]/g, '_');
+        if (fileNamePart == '') {
+            return fallback;
+        }
+        return fileNamePart;
+    }
+
     function DownloadJson(data, fileName) {
         let blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
         let url = URL.createObjectURL(blob);
@@ -840,7 +848,9 @@ window.addEventListener('DOMContentLoaded', function() {
 
     function SaveHistoryJson() {
         let data = CreateHistoryExportData();
-        let fileName = 'aql-score-history-' + CreateTimestampString(new Date()) + '.json';
+        let teamAName = SanitizeFileNamePart(data.teams[0].name, 'A');
+        let teamBName = SanitizeFileNamePart(data.teams[1].name, 'B');
+        let fileName = teamAName + '-' + teamBName + '-' + CreateTimestampString(new Date()) + '.json';
         DownloadJson(data, fileName);
     }
 
