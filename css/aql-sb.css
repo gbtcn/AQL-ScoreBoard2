@@ -93,6 +93,21 @@ div.team table {
     font-size: 24px;
 }    
 
+.team table tr.member-name>th {
+    height: 32px;
+}
+
+.team table tr.member-name>th>input {
+    border: none;
+    background: none;
+    box-sizing: border-box;
+    text-align: center;
+    width: 48px;
+    font-size: 14px;
+    min-width: 0;
+    padding: 0px 2px;
+}
+
 .team table tr.player-pt>td {
     height: 75px;
     font-size: 48px;

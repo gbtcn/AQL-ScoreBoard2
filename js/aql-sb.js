@@ -441,6 +441,30 @@ window.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 枠内に収まるようにメンバー名入力欄の文字サイズを調整する
+    function FitMemberNameInput(input) {
+        const maxFontSize = 14;
+        const minFontSize = 9;
+        input.style.fontSize = maxFontSize + 'px';
+        for (let size = maxFontSize; size >= minFontSize; size--) {
+            input.style.fontSize = size + 'px';
+            if (input.scrollWidth <= input.clientWidth) {
+                return;
+            }
+        }
+    }
+
+    // メンバー名入力欄の自動文字サイズ調整を設定
+    function SetMemberNameFitEvent() {
+        const inputs = document.querySelectorAll('.member-name input');
+        for (let i = 0; i < inputs.length; i++) {
+            FitMemberNameInput(inputs[i]);
+            inputs[i].addEventListener('input', function() {
+                FitMemberNameInput(inputs[i]);
+            }, false);
+        }
+    }
+
     // チームの初期化
     function ResetPlayerPt(team) {
         // ポイントの初期化
@@ -558,6 +582,7 @@ window.addEventListener('DOMContentLoaded', function() {
     SetIncorrectButton('b','a');
     SetDataChangeEvent('a');
     SetDataChangeEvent('b');
+    SetMemberNameFitEvent();
 
     // 画面ロード時の初期処理
     CalcAll();
