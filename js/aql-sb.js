@@ -1,6 +1,8 @@
 window.addEventListener('DOMContentLoaded', function() {
 
     let historyRecords = [];
+    let undoStack = [];
+    let redoStack = [];
 
     // 全角数字を半角数字に変換する
     function ConvertNumberDoubleToSingleByte(str) {
@@ -406,7 +408,15 @@ window.addEventListener('DOMContentLoaded', function() {
     function SetInfinity() {
         let infinity = document.getElementById("infinity");
         let max_of_questions = document.getElementById("max-of-questions");
+        infinity.addEventListener('focus', function() {
+            infinity.undoSnapshot = CaptureStateSnapshot();
+        }, false);
+        infinity.addEventListener('mousedown', function() {
+            infinity.undoSnapshot = CaptureStateSnapshot();
+        }, false);
         infinity.addEventListener('change', function() {
+            PushUndoSnapshot(infinity.undoSnapshot || CaptureStateSnapshot());
+            infinity.undoSnapshot = null;
             if (infinity.checked) {
                 max_of_questions.setAttribute("escape-value", max_of_questions.value);
                 max_of_questions.disabled = true;
@@ -434,6 +444,7 @@ window.addEventListener('DOMContentLoaded', function() {
         let p = team + playerNumber;
         if (isEnd()) {return;};
         if (document.getElementById(p + '-incorrect').innerText == '✕✕') {return;}
+        SaveUndoState();
         let pt = parseInt(document.getElementById(p + "-pt").innerText);
         document.getElementById(p + "-pt").innerText = pt + 1;
         SecretCounterUp();
@@ -457,14 +468,15 @@ window.addEventListener('DOMContentLoaded', function() {
         let p = my_team + playerNumber;
         if (isEnd()) {return;};
         let obj_x = document.getElementById(p + '-incorrect');
+        if (obj_x.innerText == '✕✕') {
+            return;
+        }
+        SaveUndoState();
         if (obj_x.innerText == '') {
             obj_x.innerText = '✕'
         }
         else if (obj_x.innerText == '✕') {
             obj_x.innerText = '✕✕';
-        }
-        else{
-            return;
         }
         // 相手の解答権が無い人を復活させる
         for (let j = 1; j <=  5; j++) {
@@ -505,6 +517,7 @@ window.addEventListener('DOMContentLoaded', function() {
                 val = NormalizeAndValidateNumberString(val);
                 val = parseInt(val);
                 if ((Number.isInteger(val)) && (val > 0)) {
+                    SaveUndoState();
                     pt_cell.innerText = val;
                     CalcAll();
                 }
@@ -521,6 +534,7 @@ window.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 else if (val == ''||val == '✕'||val == '✕✕') {
+                    SaveUndoState();
                     incorrect_cell.innerText = val;
                     CalcAll();
                 }
@@ -552,6 +566,13 @@ window.addEventListener('DOMContentLoaded', function() {
             inputs[i].addEventListener('input', function() {
                 FitMemberNameInput(inputs[i]);
             }, false);
+        }
+    }
+
+    function FitAllMemberNameInputs() {
+        const inputs = document.querySelectorAll('.member-name input');
+        for (let i = 0; i < inputs.length; i++) {
+            FitMemberNameInput(inputs[i]);
         }
     }
 
@@ -621,6 +642,143 @@ window.addEventListener('DOMContentLoaded', function() {
             ],
             history: historyRecords
         };
+    }
+
+    function CloneExportData(data) {
+        return JSON.parse(JSON.stringify(data));
+    }
+
+    function CaptureStateSnapshot() {
+        return CloneExportData(CreateHistoryExportData());
+    }
+
+    function UpdateUndoRedoButtons() {
+        document.getElementById("btn-undo").disabled = undoStack.length == 0;
+        document.getElementById("btn-redo").disabled = redoStack.length == 0;
+    }
+
+    function PushUndoSnapshot(snapshot) {
+        undoStack.push(CloneExportData(snapshot));
+        redoStack = [];
+        UpdateUndoRedoButtons();
+    }
+
+    function SaveUndoState() {
+        PushUndoSnapshot(CaptureStateSnapshot());
+    }
+
+    function RestoreStateSnapshot(snapshot) {
+        ImportHistoryData(CloneExportData(snapshot), false);
+    }
+
+    function Undo() {
+        if (undoStack.length == 0) {
+            return;
+        }
+        redoStack.push(CaptureStateSnapshot());
+        RestoreStateSnapshot(undoStack.pop());
+        UpdateUndoRedoButtons();
+    }
+
+    function Redo() {
+        if (redoStack.length == 0) {
+            return;
+        }
+        undoStack.push(CaptureStateSnapshot());
+        RestoreStateSnapshot(redoStack.pop());
+        UpdateUndoRedoButtons();
+    }
+
+    function CalculateExportTeamScore(teamData) {
+        let score = 1;
+        for (let i = 0; i < teamData.players.length; i++) {
+            score *= teamData.players[i].point;
+        }
+        return score;
+    }
+
+    function FindExportPlayer(snapshot, team, playerNumber) {
+        let playerId = team + playerNumber;
+        for (let i = 0; i < snapshot.teams.length; i++) {
+            if (snapshot.teams[i].teamId == team) {
+                for (let j = 0; j < snapshot.teams[i].players.length; j++) {
+                    if (snapshot.teams[i].players[j].playerId == playerId) {
+                        return snapshot.teams[i].players[j];
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    function CreateInitialImportedState(data) {
+        let snapshot = CloneExportData(data);
+        snapshot.currentQuestion = 1;
+        snapshot.displayQuestion = '1';
+        snapshot.history = [];
+        for (let i = 0; i < snapshot.teams.length; i++) {
+            snapshot.teams[i].score = 1;
+            snapshot.teams[i].result = '';
+            for (let j = 0; j < snapshot.teams[i].players.length; j++) {
+                snapshot.teams[i].players[j].point = 1;
+                snapshot.teams[i].players[j].incorrect = '';
+            }
+        }
+        return snapshot;
+    }
+
+    function ApplyHistoryEntryToSnapshot(snapshot, entry) {
+        if (entry.type == 'through') {
+            snapshot.currentQuestion++;
+            return;
+        }
+        let team = entry.teamId;
+        let player = FindExportPlayer(snapshot, team, entry.playerNumber);
+        if (!player) {
+            snapshot.currentQuestion++;
+            return;
+        }
+        if (entry.type == 'correct') {
+            player.point++;
+        }
+        else if (entry.type == 'incorrect') {
+            if (player.incorrect == '') {
+                player.incorrect = '✕';
+            }
+            else if (player.incorrect == '✕') {
+                player.incorrect = '✕✕';
+            }
+            let enemyTeam = team == 'a' ? 'b' : 'a';
+            for (let i = 1; i <= 5; i++) {
+                let enemyPlayer = FindExportPlayer(snapshot, enemyTeam, i);
+                if (enemyPlayer && enemyPlayer.incorrect == '✕✕') {
+                    enemyPlayer.incorrect = '✕';
+                }
+            }
+            player.point = 1;
+        }
+        snapshot.currentQuestion++;
+        for (let i = 0; i < snapshot.teams.length; i++) {
+            snapshot.teams[i].score = CalculateExportTeamScore(snapshot.teams[i]);
+        }
+    }
+
+    function ResetUndoRedoHistory() {
+        undoStack = [];
+        redoStack = [];
+        UpdateUndoRedoButtons();
+    }
+
+    function BuildImportedHistoryUndoStack(data) {
+        ResetUndoRedoHistory();
+        let replaySnapshot = CreateInitialImportedState(data);
+        let history = data.history || [];
+        for (let i = 0; i < history.length; i++) {
+            undoStack.push(CloneExportData(replaySnapshot));
+            replaySnapshot.history.push(CloneExportData(history[i]));
+            ApplyHistoryEntryToSnapshot(replaySnapshot, history[i]);
+        }
+        UpdateUndoRedoButtons();
     }
 
     function CreateTimestampString(date) {
@@ -723,10 +881,13 @@ window.addEventListener('DOMContentLoaded', function() {
         ScrollToBottomHistoryTable();
     }
 
-    function ImportHistoryData(data) {
+    function ImportHistoryData(data, saveUndo) {
         if (!data || !Array.isArray(data.teams) || !Array.isArray(data.history)) {
             alert("読み込める履歴JSONではありません");
             return;
+        }
+        if (saveUndo) {
+            SaveUndoState();
         }
 
         if (data.config) {
@@ -756,7 +917,7 @@ window.addEventListener('DOMContentLoaded', function() {
         CalcAll();
         RefreshNumberOfDone();
         ApplyShowHistoryState(data.showHistory !== false);
-        SetMemberNameFitEvent();
+        FitAllMemberNameInputs();
     }
 
     function ImportHistoryJsonFile(file) {
@@ -766,7 +927,9 @@ window.addEventListener('DOMContentLoaded', function() {
         let reader = new FileReader();
         reader.onload = function(event) {
             try {
-                ImportHistoryData(JSON.parse(event.target.result));
+                let data = JSON.parse(event.target.result);
+                ImportHistoryData(data, false);
+                BuildImportedHistoryUndoStack(data);
             }
             catch (e) {
                 alert("履歴JSONの読み込みに失敗しました");
@@ -787,11 +950,22 @@ window.addEventListener('DOMContentLoaded', function() {
         ResetHistoryTable();
         document.getElementById("a-result-display").innerText = '';
         document.getElementById("b-result-display").innerText = '';
+        ResetUndoRedoHistory();
     }, false);
 
     // "refresh"ボタン押下時の処理
     this.document.getElementById("btn-refresh").addEventListener('click', function(){
         CalcAll();
+    }, false);
+
+    // "undo"ボタン押下時の処理
+    document.getElementById("btn-undo").addEventListener('click', function(){
+        Undo();
+    }, false);
+
+    // "redo"ボタン押下時の処理
+    document.getElementById("btn-redo").addEventListener('click', function(){
+        Redo();
     }, false);
 
     // "save history"ボタン押下時の処理
@@ -811,11 +985,18 @@ window.addEventListener('DOMContentLoaded', function() {
     }, false);
 
     // "winning points"の入力時のバリデーションと再計算
+    document.getElementById("winning-pt").addEventListener('focus', function(){
+        this.undoSnapshot = CaptureStateSnapshot();
+    }, false);
+
     document.getElementById("winning-pt").addEventListener('blur', function(){
         const winPt = document.getElementById("winning-pt");
         var newValue = NormalizeAndValidateNumberString(winPt.value);
         newValue = parseInt(newValue);
         if ((Number.isInteger(newValue)) && (newValue > 0)) {
+            if (String(newValue) != winPt.getAttribute("escape-value")) {
+                PushUndoSnapshot(winPt.undoSnapshot || CaptureStateSnapshot());
+            }
             winPt.value = newValue;
             winPt.setAttribute("value", newValue);
             winPt.setAttribute("escape-value", newValue);
@@ -825,14 +1006,22 @@ window.addEventListener('DOMContentLoaded', function() {
             const escValue = winPt.getAttribute("escape-value");
             winPt.value = escValue;
         }
+        winPt.undoSnapshot = null;
     }), false;
 
     // "max of questions"の入力時のバリデーションと再計算
+    document.getElementById("max-of-questions").addEventListener('focus', function(){
+        this.undoSnapshot = CaptureStateSnapshot();
+    }, false);
+
     document.getElementById("max-of-questions").addEventListener('blur', function(){
         const maxQuestions = document.getElementById("max-of-questions");
         var newValue = NormalizeAndValidateNumberString(maxQuestions.value);
         newValue = parseInt(newValue);
         if ((Number.isInteger(newValue)) && (newValue > 0)) {
+            if (String(newValue) != maxQuestions.getAttribute("escape-value")) {
+                PushUndoSnapshot(maxQuestions.undoSnapshot || CaptureStateSnapshot());
+            }
             maxQuestions.value = newValue;
             maxQuestions.setAttribute("value", newValue);
             maxQuestions.setAttribute("escape-value", newValue);
@@ -842,17 +1031,20 @@ window.addEventListener('DOMContentLoaded', function() {
             const escValue = maxQuestions.getAttribute("escape-value");
             maxQuestions.value = escValue;
         }
+        maxQuestions.undoSnapshot = null;
     }), false;
 
     // "Throwgh"ボタン押下時の処理
     document.getElementById("through").addEventListener('click', function() {
         if (isEnd()) {return;};
+        SaveUndoState();
         SecretCounterUp();
         AddARowToHistoryTable();
     }, false);
 
 　  // "Show Count/Hide Count"ボタン押下時の処理
     document.getElementById("show-hide-counter").addEventListener('click', function() {
+        SaveUndoState();
         let showhide_count_btn = document.getElementById("show-hide-counter");
         if (showhide_count_btn.value == 'Show Count') {
             showhide_count_btn.value = 'Hide Count';
@@ -865,6 +1057,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
     // "Show History/Hide History"ボタン押下時の処理
     document.getElementById("history-show-hide").addEventListener('click', function() {
+        SaveUndoState();
         let showhide_history_btn = document.getElementById("history-show-hide");
         let bshow = showhide_history_btn.value == 'Show History';
         if (bshow) {
