@@ -233,6 +233,8 @@ window.addEventListener('DOMContentLoaded', function() {
             for (let j = 1; j <= 5; j++) {
                 let player = team + j;
                 SumOneOlayerResult(player)
+                SumOneMemberResult(player, 1);
+                SumOneMemberResult(player, 2);
             }
         }
     }
@@ -245,14 +247,32 @@ window.addEventListener('DOMContentLoaded', function() {
         let cnt_incorrect = 0;
         for (let i = 0; i < cells.length; i ++) {
             let txt = cells[i].innerText;
-            if (txt == '〇') {
+            if (txt.startsWith('〇')) {
                 cnt_correct++;
             }
-            else if (txt == '✕'){
+            else if (txt.startsWith('✕')){
                 cnt_incorrect++;
             }
         }
         result_cell.innerText = `〇:${cnt_correct} ✕:${cnt_incorrect}`;
+    }
+
+    // historyの個人メンバー別の正誤成績を集計して表示する
+    function SumOneMemberResult(player, memberNumber) {
+        let cells = document.getElementsByClassName(player + "-member-" + memberNumber + "-history");
+        let result_cell = document.getElementById(player + "-member-" + memberNumber + "-sum");
+        let cnt_correct = 0;
+        let cnt_incorrect = 0;
+        for (let i = 0; i < cells.length; i ++) {
+            let txt = cells[i].innerText;
+            if (txt.startsWith('〇')) {
+                cnt_correct++;
+            }
+            else if (txt.startsWith('✕')){
+                cnt_incorrect++;
+            }
+        }
+        result_cell.innerHTML = `〇:${cnt_correct}<br>✕:${cnt_incorrect}`;
     }
 
     // historyテーブルを一番下までスクロールする
@@ -264,7 +284,16 @@ window.addEventListener('DOMContentLoaded', function() {
     }
 
     // historyテーブルに列を追加する
-    function AddARowToHistoryTable(team, player, ox) {
+    function SetHistoryResultCell(cell, ox) {
+        if (ox == 'o') {            // 半角文字
+            cell.innerText = '〇';  // 全角文字
+        }
+        else if (ox == 'x') {       // 半角文字
+            cell.innerText = '✕';  // 全角文字
+        }
+    }
+
+    function AddARowToHistoryTable(team, player, ox, memberNumber) {
         let table = document.getElementsByClassName("history-table");
         for (let i = 0; i < table.length; i ++) {
             let table_i = table[i];
@@ -283,20 +312,28 @@ window.addEventListener('DOMContentLoaded', function() {
                 if (i ==0) {
                     cell_player_number = 6 - cell_player_number;
                 }
-                let cell = row.insertCell(-1);
-                cell.id = team + cell_player_number + '-history-' + num_row;
-                cell.classList = team + cell_player_number + '-history';
-                cell.setAttribute('colspan', '2');
-                if (is_acted_table && player == cell_player_number) {
-                    if (ox == 'o') {            // 半角文字
-                        cell.innerText = '〇';  // 全角文字
-                    }
-                    else if (ox == 'x') {       // 半角文字
-                        cell.innerText = '✕';  // 全角文字
+                if (is_acted_table && player == cell_player_number && memberNumber != undefined) {
+                    for (let memberCellNumber = 1; memberCellNumber <= 2; memberCellNumber++) {
+                        let cell = row.insertCell(-1);
+                        cell.id = team + cell_player_number + '-' + memberCellNumber + '-history-' + num_row;
+                        cell.classList.add(team + cell_player_number + '-history');
+                        cell.classList.add(team + cell_player_number + '-member-' + memberCellNumber + '-history');
+                        if (memberNumber == memberCellNumber) {
+                            SetHistoryResultCell(cell, ox);
+                        }
                     }
                 }
-                if (team == undefined) {
-                    cell.style.backgroundColor = '#CCCCCC';
+                else {
+                    let cell = row.insertCell(-1);
+                    cell.id = team + cell_player_number + '-history-' + num_row;
+                    cell.classList.add(team + cell_player_number + '-history');
+                    cell.setAttribute('colspan', '2');
+                    if (is_acted_table && player == cell_player_number) {
+                        SetHistoryResultCell(cell, ox);
+                    }
+                    if (team == undefined) {
+                        cell.style.backgroundColor = '#CCCCCC';
+                    }
                 }
             }
         }
@@ -366,14 +403,14 @@ window.addEventListener('DOMContentLoaded', function() {
     }
 
     // 正解を入力する
-    function InputCorrect(team, playerNumber) {
+    function InputCorrect(team, playerNumber, memberNumber) {
         let p = team + playerNumber;
         if (isEnd()) {return;};
         if (document.getElementById(p + '-incorrect').innerText == '✕✕') {return;}
         let pt = parseInt(document.getElementById(p + "-pt").innerText);
         document.getElementById(p + "-pt").innerText = pt + 1;
         SecretCounterUp();
-        AddARowToHistoryTable(team, playerNumber, 'o');
+        AddARowToHistoryTable(team, playerNumber, 'o', memberNumber);
         CalcAll();
     }
 
@@ -389,7 +426,7 @@ window.addEventListener('DOMContentLoaded', function() {
     }
 
     // 誤答を入力する
-    function InputIncorrect(my_team, enemy_team, playerNumber) {
+    function InputIncorrect(my_team, enemy_team, playerNumber, memberNumber) {
         let p = my_team + playerNumber;
         if (isEnd()) {return;};
         let obj_x = document.getElementById(p + '-incorrect');
@@ -412,7 +449,7 @@ window.addEventListener('DOMContentLoaded', function() {
         }
         document.getElementById(p + "-pt").innerText = 1;
         SecretCounterUp();
-        AddARowToHistoryTable(my_team, playerNumber, 'x');
+        AddARowToHistoryTable(my_team, playerNumber, 'x', memberNumber);
         CalcAll();
     }
 
@@ -421,10 +458,10 @@ window.addEventListener('DOMContentLoaded', function() {
         for (let i = 1; i <= 5; i++) {
             for (let memberNumber = 1; memberNumber <= 2; memberNumber++) {
                 document.getElementById("member-" + team + i + "-" + memberNumber + "-btn-correct").addEventListener('click', function() {
-                    InputCorrect(team, i);
+                    InputCorrect(team, i, memberNumber);
                 }, false);
                 document.getElementById("member-" + team + i + "-" + memberNumber + "-btn-incorrect").addEventListener('click', function() {
-                    InputIncorrect(team, enemy_team, i);
+                    InputIncorrect(team, enemy_team, i, memberNumber);
                 }, false);
             }
         }

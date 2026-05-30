@@ -158,6 +158,11 @@ div.team div.history-header {
     margin: 40px 0px 0px 0px;
 }
 
+.team table tr.member-result-sum>th {
+    font-size: 12px;
+    line-height: 14px;
+}
+
 .team div.history-data {
     border: 1px;
     height: 250px;
