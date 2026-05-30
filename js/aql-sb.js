@@ -360,15 +360,21 @@ window.addEventListener('DOMContentLoaded', function() {
         for (let i = 1; i <= 5; i ++) {
             let p = team + i;
             document.getElementById(p + "-btn-correct").addEventListener('click', function() {
-                if (isEnd()) {return;};
-                if (document.getElementById(p + '-incorrect').innerText == '✕✕') {return;}
-                let pt = parseInt(document.getElementById(p + "-pt").innerText);
-                document.getElementById(p + "-pt").innerText = pt + 1;
-                SecretCounterUp();
-                AddARowToHistoryTable(team, i, 'o');
-                CalcAll();
+                InputCorrect(team, i);
             }, false);
         }
+    }
+
+    // 正解を入力する
+    function InputCorrect(team, playerNumber) {
+        let p = team + playerNumber;
+        if (isEnd()) {return;};
+        if (document.getElementById(p + '-incorrect').innerText == '✕✕') {return;}
+        let pt = parseInt(document.getElementById(p + "-pt").innerText);
+        document.getElementById(p + "-pt").innerText = pt + 1;
+        SecretCounterUp();
+        AddARowToHistoryTable(team, playerNumber, 'o');
+        CalcAll();
     }
 
     // 誤答ボタン押下イベントを設定
@@ -377,30 +383,50 @@ window.addEventListener('DOMContentLoaded', function() {
             let p = my_team + i;
 
             document.getElementById(p + "-btn-incorrect").addEventListener('click', function() {
-                if (isEnd()) {return;};
-                let obj_x = document.getElementById(p + '-incorrect');
-                if (obj_x.innerText == '') {
-                    obj_x.innerText = '✕'
-                }
-                else if (obj_x.innerText == '✕') {
-                    obj_x.innerText = '✕✕';
-                }
-                else{
-                    return;
-                }
-                // 相手の解答権が無い人を復活させる
-                for (let j = 1; j <=  5; j++) {
-                    let e = enemy_team + j;
-                    let obj_e_x = document.getElementById(e + '-incorrect');
-                    if (obj_e_x.innerText == '✕✕') {
-                        obj_e_x.innerText = '✕';
-                    }
-                }
-                document.getElementById(p + "-pt").innerText = 1;
-                SecretCounterUp();
-                AddARowToHistoryTable(my_team, i, 'x');
-                CalcAll();
+                InputIncorrect(my_team, enemy_team, i);
             }, false);
+        }
+    }
+
+    // 誤答を入力する
+    function InputIncorrect(my_team, enemy_team, playerNumber) {
+        let p = my_team + playerNumber;
+        if (isEnd()) {return;};
+        let obj_x = document.getElementById(p + '-incorrect');
+        if (obj_x.innerText == '') {
+            obj_x.innerText = '✕'
+        }
+        else if (obj_x.innerText == '✕') {
+            obj_x.innerText = '✕✕';
+        }
+        else{
+            return;
+        }
+        // 相手の解答権が無い人を復活させる
+        for (let j = 1; j <=  5; j++) {
+            let e = enemy_team + j;
+            let obj_e_x = document.getElementById(e + '-incorrect');
+            if (obj_e_x.innerText == '✕✕') {
+                obj_e_x.innerText = '✕';
+            }
+        }
+        document.getElementById(p + "-pt").innerText = 1;
+        SecretCounterUp();
+        AddARowToHistoryTable(my_team, playerNumber, 'x');
+        CalcAll();
+    }
+
+    // 個人用の正解・誤答ボタン押下イベントを設定
+    function SetMemberStatusButton(team, enemy_team) {
+        for (let i = 1; i <= 5; i++) {
+            for (let memberNumber = 1; memberNumber <= 2; memberNumber++) {
+                document.getElementById("member-" + team + i + "-" + memberNumber + "-btn-correct").addEventListener('click', function() {
+                    InputCorrect(team, i);
+                }, false);
+                document.getElementById("member-" + team + i + "-" + memberNumber + "-btn-incorrect").addEventListener('click', function() {
+                    InputIncorrect(team, enemy_team, i);
+                }, false);
+            }
         }
     }
 
@@ -580,6 +606,8 @@ window.addEventListener('DOMContentLoaded', function() {
     SetCorrectButton('b');
     SetIncorrectButton('a','b');
     SetIncorrectButton('b','a');
+    SetMemberStatusButton('a','b');
+    SetMemberStatusButton('b','a');
     SetDataChangeEvent('a');
     SetDataChangeEvent('b');
     SetMemberNameFitEvent();

@@ -108,6 +108,19 @@ div.team table {
     padding: 0px 2px;
 }
 
+.team table tr.member-correct-input>td,
+.team table tr.member-incorrect-input>td {
+    height: 30px;
+    border: none;
+}
+
+.team table tr.member-correct-input>td>input,
+.team table tr.member-incorrect-input>td>input {
+    width: 45px;
+    height: 26px;
+    padding: 0px;
+}
+
 .team table tr.player-pt>td {
     height: 75px;
     font-size: 48px;
