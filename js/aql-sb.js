@@ -1,5 +1,7 @@
 window.addEventListener('DOMContentLoaded', function() {
 
+    let historyRecords = [];
+
     // 全角数字を半角数字に変換する
     function ConvertNumberDoubleToSingleByte(str) {
         ret = str.replace(/[０-９]/g, function (s) {
@@ -293,7 +295,25 @@ window.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function AddARowToHistoryTable(team, player, ox, memberNumber) {
+    function RecordHistoryEntry(questionNo, team, player, ox, memberNumber) {
+        let type = 'through';
+        if (ox == 'o') {
+            type = 'correct';
+        }
+        else if (ox == 'x') {
+            type = 'incorrect';
+        }
+        historyRecords.push({
+            questionNo: questionNo,
+            type: type,
+            teamId: team || null,
+            playerNumber: player || null,
+            playerId: team && player ? team + player : null,
+            memberNumber: memberNumber || null
+        });
+    }
+
+    function RenderHistoryRow(questionNo, team, player, ox, memberNumber) {
         let table = document.getElementsByClassName("history-table");
         for (let i = 0; i < table.length; i ++) {
             let table_i = table[i];
@@ -304,7 +324,7 @@ window.addEventListener('DOMContentLoaded', function() {
             let cell1 = row.insertCell(-1);
             cell1.classList.add('row-header');
             RefreshNumberOfDone();
-            cell1.innerText = num_row;
+            cell1.innerText = questionNo;
             //
             let is_acted_table = (id == 'history-team-' + team);
             for (let j = 1; j <= 5; j ++) {
@@ -341,6 +361,12 @@ window.addEventListener('DOMContentLoaded', function() {
         ScrollToBottomHistoryTable();
     }
 
+    function AddARowToHistoryTable(team, player, ox, memberNumber) {
+        let questionNo = document.getElementById("history-team-a").rows.length;
+        RecordHistoryEntry(questionNo, team, player, ox, memberNumber);
+        RenderHistoryRow(questionNo, team, player, ox, memberNumber);
+    }
+
     // historyテーブルの履歴行を全て削除する
     function DeleteAllHistoryRows() {
         let table = document.getElementsByClassName("history-table");
@@ -356,6 +382,7 @@ window.addEventListener('DOMContentLoaded', function() {
     function ResetHistoryTable() {
         // 履歴行を全て削除する
         DeleteAllHistoryRows();
+        historyRecords = [];
         // 個人成績を初期化する
         SumAllPlayersResult();
     }
@@ -544,6 +571,210 @@ window.addEventListener('DOMContentLoaded', function() {
         let outtxt = '';
     }
 
+    function GetTeamExportData(team) {
+        let teamElement = document.getElementById("team-" + team);
+        let teamName = teamElement.querySelector("tr.team-name input").value;
+        let players = [];
+        for (let i = 1; i <= 5; i++) {
+            players.push({
+                playerId: team + i,
+                slotName: document.getElementById("name-" + team + i).value,
+                members: [
+                    document.getElementById("member-" + team + i + "-1").value,
+                    document.getElementById("member-" + team + i + "-2").value
+                ],
+                point: parseInt(document.getElementById(team + i + "-pt").innerText),
+                incorrect: document.getElementById(team + i + "-incorrect").innerText,
+                resultSummary: document.getElementById(team + i + "-player-sum").innerText,
+                memberResultSummary: [
+                    document.getElementById(team + i + "-member-1-sum").innerText,
+                    document.getElementById(team + i + "-member-2-sum").innerText
+                ]
+            });
+        }
+        return {
+            teamId: team,
+            name: teamName,
+            score: parseInt(document.getElementById("team-" + team + "-pt").innerText),
+            result: document.getElementById(team + "-result-display").innerText,
+            players: players
+        };
+    }
+
+    function CreateHistoryExportData() {
+        return {
+            appName: 'AQL Score Board',
+            exportVersion: 1,
+            exportedAt: new Date().toISOString(),
+            config: {
+                winningPoint: parseInt(document.getElementById("winning-pt").value),
+                maxQuestions: document.getElementById("infinity").checked ? null : parseInt(document.getElementById("max-of-questions").value),
+                infinity: document.getElementById("infinity").checked
+            },
+            currentQuestion: parseInt(document.getElementById("secret-counter").innerText),
+            displayQuestion: document.getElementById("number-of-done").innerText,
+            showCount: document.getElementById("show-hide-counter").value == 'Hide Count',
+            showHistory: document.getElementById("history-show-hide").value == 'Hide History',
+            teams: [
+                GetTeamExportData('a'),
+                GetTeamExportData('b')
+            ],
+            history: historyRecords
+        };
+    }
+
+    function CreateTimestampString(date) {
+        function pad2(value) {
+            return String(value).padStart(2, '0');
+        }
+        return date.getFullYear()
+            + pad2(date.getMonth() + 1)
+            + pad2(date.getDate())
+            + '-'
+            + pad2(date.getHours())
+            + pad2(date.getMinutes())
+            + pad2(date.getSeconds());
+    }
+
+    function DownloadJson(data, fileName) {
+        let blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+        let url = URL.createObjectURL(blob);
+        let link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
+    function SaveHistoryJson() {
+        let data = CreateHistoryExportData();
+        let fileName = 'aql-score-history-' + CreateTimestampString(new Date()) + '.json';
+        DownloadJson(data, fileName);
+    }
+
+    function GetOxFromHistoryType(type) {
+        if (type == 'correct') {
+            return 'o';
+        }
+        else if (type == 'incorrect') {
+            return 'x';
+        }
+        return undefined;
+    }
+
+    function ApplyShowHistoryState(showHistory) {
+        let showhide_history_btn = document.getElementById("history-show-hide");
+        showhide_history_btn.value = showHistory ? 'Hide History' : 'Show History';
+        let history_data_row = document.getElementsByClassName("history");
+        for (let i = 0; i < history_data_row.length; i++) {
+            history_data_row[i].style.display = showHistory ? "block" : "none";
+        }
+    }
+
+    function ApplyImportedTeamData(teamData) {
+        if (!teamData || !teamData.teamId) {
+            return;
+        }
+        let team = teamData.teamId;
+        let teamElement = document.getElementById("team-" + team);
+        teamElement.querySelector("tr.team-name input").value = teamData.name || team.toUpperCase();
+        if (!teamData.players) {
+            return;
+        }
+        for (let i = 0; i < teamData.players.length; i++) {
+            let player = teamData.players[i];
+            let playerNumber = parseInt(player.playerId.replace(team, ''));
+            document.getElementById("name-" + team + playerNumber).value = player.slotName || team.toUpperCase() + playerNumber;
+            document.getElementById("member-" + team + playerNumber + "-1").value = player.members && player.members[0] ? player.members[0] : '';
+            document.getElementById("member-" + team + playerNumber + "-2").value = player.members && player.members[1] ? player.members[1] : '';
+            document.getElementById(team + playerNumber + "-pt").innerText = player.point || 1;
+            document.getElementById(team + playerNumber + "-incorrect").innerText = player.incorrect || '';
+        }
+    }
+
+    function RenderImportedHistory(history) {
+        DeleteAllHistoryRows();
+        historyRecords = [];
+        if (!history) {
+            SumAllPlayersResult();
+            return;
+        }
+        for (let i = 0; i < history.length; i++) {
+            let entry = history[i];
+            historyRecords.push({
+                questionNo: entry.questionNo,
+                type: entry.type,
+                teamId: entry.teamId || null,
+                playerNumber: entry.playerNumber || null,
+                playerId: entry.playerId || null,
+                memberNumber: entry.memberNumber || null
+            });
+            RenderHistoryRow(
+                entry.questionNo,
+                entry.teamId || undefined,
+                entry.playerNumber || undefined,
+                GetOxFromHistoryType(entry.type),
+                entry.memberNumber || undefined
+            );
+        }
+        SumAllPlayersResult();
+        ScrollToBottomHistoryTable();
+    }
+
+    function ImportHistoryData(data) {
+        if (!data || !Array.isArray(data.teams) || !Array.isArray(data.history)) {
+            alert("読み込める履歴JSONではありません");
+            return;
+        }
+
+        if (data.config) {
+            document.getElementById("winning-pt").value = data.config.winningPoint || 200;
+            document.getElementById("winning-pt").setAttribute("escape-value", document.getElementById("winning-pt").value);
+            let infinity = document.getElementById("infinity");
+            let maxQuestions = document.getElementById("max-of-questions");
+            infinity.checked = data.config.infinity == true;
+            if (infinity.checked) {
+                maxQuestions.setAttribute("escape-value", data.config.maxQuestions || maxQuestions.getAttribute("escape-value") || 40);
+                maxQuestions.disabled = true;
+                maxQuestions.value = "no limit";
+            }
+            else {
+                maxQuestions.disabled = false;
+                maxQuestions.value = data.config.maxQuestions || 40;
+                maxQuestions.setAttribute("escape-value", maxQuestions.value);
+            }
+        }
+
+        for (let i = 0; i < data.teams.length; i++) {
+            ApplyImportedTeamData(data.teams[i]);
+        }
+        document.getElementById("secret-counter").innerText = data.currentQuestion || 1;
+        document.getElementById("show-hide-counter").value = data.showCount ? 'Hide Count' : 'Show Count';
+        RenderImportedHistory(data.history);
+        CalcAll();
+        RefreshNumberOfDone();
+        ApplyShowHistoryState(data.showHistory !== false);
+        SetMemberNameFitEvent();
+    }
+
+    function ImportHistoryJsonFile(file) {
+        if (!file) {
+            return;
+        }
+        let reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                ImportHistoryData(JSON.parse(event.target.result));
+            }
+            catch (e) {
+                alert("履歴JSONの読み込みに失敗しました");
+            }
+        };
+        reader.readAsText(file);
+    }
+
     // "reset"ボタン押下時の処理
     document.getElementById("btn-reset").addEventListener('click', function() {
         if (!confirm('全てリセットしてよろしいですか？')) {
@@ -561,6 +792,22 @@ window.addEventListener('DOMContentLoaded', function() {
     // "refresh"ボタン押下時の処理
     this.document.getElementById("btn-refresh").addEventListener('click', function(){
         CalcAll();
+    }, false);
+
+    // "save history"ボタン押下時の処理
+    document.getElementById("btn-save-history").addEventListener('click', function(){
+        SaveHistoryJson();
+    }, false);
+
+    // "import history"ボタン押下時の処理
+    document.getElementById("btn-import-history").addEventListener('click', function(){
+        document.getElementById("import-history-file").click();
+    }, false);
+
+    // 履歴JSONファイル選択時の処理
+    document.getElementById("import-history-file").addEventListener('change', function(){
+        ImportHistoryJsonFile(this.files[0]);
+        this.value = '';
     }, false);
 
     // "winning points"の入力時のバリデーションと再計算

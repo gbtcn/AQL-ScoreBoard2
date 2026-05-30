@@ -8,6 +8,10 @@ div#settings>input {
     text-align: center;
 }
 
+div#settings>input#import-history-file {
+    display: none;
+}
+
 #config>div {
     display: inline-block;
     margin: 2px 10px;
